@@ -1,0 +1,73 @@
+#!/bin/sh
+
+set -eu
+
+while read source version homepage location
+do
+	if grep -qs "^${source}$" drafted
+	then
+		continue
+	fi
+
+	patch="/tmp/${source}.diff.txt"
+
+	curl -qs http://sources.debian.net/data/main/$(echo ${source} | cut -b1)/${source}/${version}/debian/control > /tmp/a
+	sed -e "s@Homepage: ${homepage}@Homepage: ${location}@g" < /tmp/a > /tmp/b
+	diff -urNad /tmp/a /tmp/b > ${patch} || true
+	sed -i \
+		-e 's@/tmp/a@a/debian/control@g' \
+		-e 's@/tmp/b@b/debian/control@g' ${patch}
+
+	body="$(mktemp)"
+	cat >${body} <<EOF
+Source: ${source}
+Version: ${version}
+Severity: wishlist
+Tags: patch
+User: lamby@debian.org
+Usertags: homepage-field
+
+Hi,
+
+It looks like the Homepage field for ${source} needs updating:
+
+  $ curl -qs -I '${homepage}' | \\
+  	awk '/Location: / { print \$2 }'
+  ${location}
+
+
+Patch attached.
+
+
+Regards,
+
+-- 
+      ,''\`.
+     : :'  :     Chris Lamb
+     \`. \`'\`      lamby@debian.org / chris-lamb.co.uk
+       \`-
+EOF
+	clear;
+	cat ${body}
+	echo
+	echo =====================================================================
+	echo
+	cat ${patch}
+	echo
+
+	while :
+	do
+		case "$(read X </dev/tty)" in
+		s)
+			break
+			;;
+		*)
+			DRAFT_SUBJECT="${source}: Please update Homepage field" DRAFT_TO="submit@bugs.debian.org" DRAFT_EXTRA_HEADERS="X-Me-Personality: 20851409" DRAFT_ATTACHMENT="${patch}" ~/git/projects/tickle-me-email/tickle-me-email draft - < ${body} &
+			echo ${source} >> drafted
+			break
+			;;
+		esac
+	done
+
+
+done < changed

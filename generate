@@ -1,0 +1,39 @@
+#!/bin/sh
+
+set -eu
+
+grep-dctrl \
+	--field Homepage . \
+	--show-field Package,Version,Homepage \
+	--no-field-names \
+	/var/lib/apt/lists/127.0.0.1_httpredir.debian.org_dists_sid_main_source_Sources | \
+		grep . | \
+		while read -r source
+		do
+			read -r version
+			read -r homepage
+
+			if grep -qs "^${source}\b" checked
+			then
+				continue
+			fi
+
+			echo ${source} >> checked
+
+			echo "I: Checking ${source} ${homepage}"
+			location="$(curl -m4 -qs -I "${homepage}" | awk '/^Location: / { print $2 }' | tr '\r' '\n' | head -n1)"
+
+			# No redirect
+			if [ "${location}" = "" ]
+			then
+				continue
+			fi
+
+			# Ignore changes to backslashes
+			if [ "${location}" = "${homepage}/" ] || [ "${location}/" = "${homepage}" ]
+			then
+				continue
+			fi
+
+			printf "%s\t%s\t%s\t%s\n" "${source}" "${version}" "${homepage}" "${location}" >> changed
+		done
