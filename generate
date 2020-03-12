@@ -6,7 +6,7 @@ grep-dctrl \
 	--field Homepage . \
 	--show-field Package,Version,Homepage \
 	--no-field-names \
-	/var/lib/apt/lists/127.0.0.1_httpredir.debian.org_dists_sid_main_source_Sources | \
+	/var/lib/apt/lists/127.0.0.1_deb.debian.org_dists_sid_main_source_Sources | \
 		grep . | \
 		while read -r source
 		do
